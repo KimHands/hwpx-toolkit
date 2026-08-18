@@ -6,6 +6,7 @@ import zipfile
 import collections
 import struct
 from pathlib import Path
+from xml.sax.saxutils import escape as _xml_escape
 
 SECTION_PATH = "Contents/section0.xml"
 
@@ -198,3 +199,42 @@ def clone_equation(xml, template_script, anchor):
     clone = re.sub(r'(<hp:equation\s+id=")\d+(")',
                    r'\g<1>%d\g<2>' % new_id, m.group(0), count=1)
     return xml.replace(anchor, clone + anchor, 1)
+
+
+def _memo_spans(xml):
+    return [(m.start(), m.end()) for m in _MEMO_SUBLIST.finditer(xml)]
+
+
+def _mask_memos(xml):
+    spans = _memo_spans(xml)
+    if not spans:
+        return xml
+    chars = list(xml)
+    for s, e in spans:
+        for i in range(s, e):
+            chars[i] = "#"
+    return "".join(chars)
+
+
+def enumerate_body_paragraphs(xml, eq_marker="⟨식⟩"):
+    masked = _mask_memos(xml)
+    mspans = _memo_spans(xml)
+    out = []
+    idx = -1
+    for pm in _P.finditer(masked):
+        s, e = pm.start(), pm.end()
+        region = xml[s:e]
+        body = strip_memo_sublists(region)
+        body = _EQUATION.sub(f"<hp:t>{eq_marker}</hp:t>", body)
+        display = "".join(_T.findall(body)).strip()
+        if not display:
+            continue
+        idx += 1
+        t_nodes = []
+        for tm in _T.finditer(region):
+            a = s + tm.start(1)
+            b = s + tm.end(1)
+            if not any(ms <= a < me for ms, me in mspans):
+                t_nodes.append((a, b))
+        out.append({"index": idx, "display": display, "t_nodes": t_nodes})
+    return out
