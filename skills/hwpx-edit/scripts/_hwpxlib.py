@@ -234,7 +234,7 @@ def enumerate_body_paragraphs(xml, eq_marker="⟨식⟩"):
         for tm in _T.finditer(region):
             a = s + tm.start(1)
             b = s + tm.end(1)
-            if not any(ms <= a < me for ms, me in mspans):
+            if not any(a < me and b > ms for ms, me in mspans):
                 t_nodes.append((a, b))
         out.append({"index": idx, "display": display, "t_nodes": t_nodes})
     return out
