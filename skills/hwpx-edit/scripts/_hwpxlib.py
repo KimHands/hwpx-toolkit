@@ -105,3 +105,37 @@ def verify(hwpx_path):
         "hyperlink_fields": types.count("HYPERLINK"),
         "dup_equation_ids": dup,
     }
+
+
+_MEMO_FIELD = re.compile(
+    r'<hp:ctrl><hp:fieldBegin[^>]*type="MEMO".*?</hp:fieldBegin></hp:ctrl>', re.S)
+_MEMO_ID = re.compile(
+    r'<hp:fieldBegin id="(\d+)" type="MEMO"')
+_PARAM_ID = re.compile(r'name="ID">([^<]*)</hp:stringParam>')
+_PARAM_AUTHOR = re.compile(r'name="Author">([^<]*)</hp:stringParam>')
+
+
+def list_memos(xml):
+    out = []
+    for m in re.finditer(
+            r'<hp:fieldBegin[^>]*type="MEMO".*?</hp:fieldBegin>', xml, re.S):
+        block = m.group(0)
+        pid = _PARAM_ID.search(block)
+        author = _PARAM_AUTHOR.search(block)
+        sub = re.search(r'<hp:subList>.*?</hp:subList>', block, re.S)
+        comment = "".join(_T.findall(sub.group(0))) if sub else ""
+        out.append({
+            "id": pid.group(1) if pid else "",
+            "author": author.group(1) if author else None,
+            "comment": comment,
+        })
+    return out
+
+
+def remove_memos(xml):
+    memo_ids = _MEMO_ID.findall(xml)
+    new_xml, n = _MEMO_FIELD.subn("", xml)
+    for mid in memo_ids:
+        pat = r'<hp:ctrl><hp:fieldEnd beginIDRef="%s"[^>]*/></hp:ctrl>' % re.escape(mid)
+        new_xml = re.sub(pat, "", new_xml)
+    return new_xml, n
