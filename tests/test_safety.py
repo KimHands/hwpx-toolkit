@@ -1,5 +1,7 @@
 import zipfile
 
+import pytest
+
 import _hwpxlib as lib
 from conftest import make_hwpx, SECTION_XML
 
@@ -43,3 +45,13 @@ def test_verify(tmp_path):
     assert report["memo_fields"] == 1
     assert report["hyperlink_fields"] == 1
     assert report["dup_equation_ids"] == []
+
+
+def test_repackage_same_path_raises_and_preserves_original(tmp_path):
+    src = make_hwpx(tmp_path)
+    with pytest.raises(ValueError, match="never modify input in place"):
+        lib.repackage(src, src, {})
+    # Original must still be intact
+    with zipfile.ZipFile(src) as z:
+        xml = z.read("Contents/section0.xml").decode("utf-8")
+    assert "첫 문단 본문이다." in xml

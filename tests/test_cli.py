@@ -53,3 +53,27 @@ def test_verify(sample_hwpx):
     r = run("verify", sample_hwpx)
     assert r.returncode == 0
     assert "wellformed" in r.stdout.lower() or "True" in r.stdout
+
+
+def test_figure_swap(tmp_path):
+    from conftest import PNG_1x1
+    src = make_hwpx(tmp_path)
+    out = str(tmp_path / "swapped.hwpx")
+    # Write a distinct replacement PNG (flip one byte so bytes differ from original)
+    replacement_png = bytearray(PNG_1x1)
+    replacement_png[-1] ^= 0xFF
+    replacement_png = bytes(replacement_png)
+    png_path = str(tmp_path / "new.png")
+    Path(png_path).write_bytes(replacement_png)
+
+    r = run("figure", "swap", src, "-o", out, "--slot", "image1", "--png", png_path)
+    assert r.returncode == 0
+    assert Path(out).exists()
+    # OUT must differ from SRC
+    assert Path(out).read_bytes() != Path(src).read_bytes()
+    # Swapped bytes must be present in OUT's BinData/image1.png
+    with zipfile.ZipFile(out) as z:
+        assert z.read("BinData/image1.png") == replacement_png
+    # SRC must be unchanged
+    with zipfile.ZipFile(src) as z:
+        assert z.read("BinData/image1.png") == PNG_1x1

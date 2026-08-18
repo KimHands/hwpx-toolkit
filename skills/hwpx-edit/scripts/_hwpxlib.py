@@ -5,6 +5,7 @@ import re
 import zipfile
 import collections
 import struct
+from pathlib import Path
 
 SECTION_PATH = "Contents/section0.xml"
 
@@ -72,6 +73,8 @@ def is_wellformed(xml):
 
 
 def repackage(original_path, out_path, replacements):
+    if Path(out_path).resolve() == Path(original_path).resolve():
+        raise ValueError("out_path must differ from original_path (never modify input in place)")
     with zipfile.ZipFile(original_path, "r") as zin, \
             zipfile.ZipFile(out_path, "w") as zout:
         for item in zin.infolist():
@@ -110,8 +113,8 @@ def verify(hwpx_path):
 
 _MEMO_FIELD = re.compile(
     r'<hp:ctrl><hp:fieldBegin[^>]*type="MEMO".*?</hp:fieldBegin></hp:ctrl>', re.S)
-_MEMO_ID = re.compile(
-    r'<hp:fieldBegin id="(\d+)" type="MEMO"')
+_MEMO_FIELDBEGIN_TAG = re.compile(r'<hp:fieldBegin\b[^>]*type="MEMO"[^>]*>')
+_ID_ATTR = re.compile(r'\bid="(\d+)"')
 _PARAM_ID = re.compile(r'name="ID">([^<]*)</hp:stringParam>')
 _PARAM_AUTHOR = re.compile(r'name="Author">([^<]*)</hp:stringParam>')
 
@@ -134,7 +137,11 @@ def list_memos(xml):
 
 
 def remove_memos(xml):
-    memo_ids = _MEMO_ID.findall(xml)
+    memo_ids = [
+        _ID_ATTR.search(tag).group(1)
+        for tag in _MEMO_FIELDBEGIN_TAG.findall(xml)
+        if _ID_ATTR.search(tag)
+    ]
     new_xml, n = _MEMO_FIELD.subn("", xml)
     for mid in memo_ids:
         pat = r'<hp:ctrl><hp:fieldEnd beginIDRef="%s"[^>]*/></hp:ctrl>' % re.escape(mid)
