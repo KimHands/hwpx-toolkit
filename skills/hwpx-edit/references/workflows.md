@@ -141,8 +141,8 @@ See `hwpx-internals.md` §Citations for the temp-token pattern and guidance on s
 ## 가이드 작업 선택 플로우
 의존 안전 규칙: 각 텍스트 변경 작업 직전 직전 산출물에서 재추출(신선도) · 번호 버전 파일 유지 · 최종 verify.
 
-1. 사전 스캔: `python3 hwpx.py verify doc.hwpx` (+ 필요시 `extract --memos`/`--equations`).
+1. 사전 스캔: `python3 hwpx.py verify doc.hwpx` (+ 필요시 `python3 hwpx.py extract doc.hwpx --memos` / `--equations`).
 2. 사용자에게 작업 다중선택 제시 → 선택.
-3. 선택 순서대로 체이닝: `memo clear doc.hwpx -o doc_v1.hwpx` →
-   (재추출) `proofread apply doc_v1.hwpx -o doc_v2.hwpx --from c.json` → … .
+3. 선택 순서대로 체이닝: `python3 hwpx.py memo clear doc.hwpx -o doc_v1.hwpx` →
+   (재추출) `python3 hwpx.py proofread apply doc_v1.hwpx -o doc_v2.hwpx --from c.json` → … .
 4. 최종: `verify doc_vN.hwpx` 후 HWP로 열어 확인 안내.
