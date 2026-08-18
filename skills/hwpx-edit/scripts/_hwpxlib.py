@@ -139,3 +139,15 @@ def remove_memos(xml):
         pat = r'<hp:ctrl><hp:fieldEnd beginIDRef="%s"[^>]*/></hp:ctrl>' % re.escape(mid)
         new_xml = re.sub(pat, "", new_xml)
     return new_xml, n
+
+
+def apply_replacements(xml, pairs):
+    results = []
+    for old, new in pairs:
+        count = xml.count(old)
+        if count != 1:
+            raise ValueError(
+                "anchor not unique (count=%d): %r" % (count, old))
+        xml = xml.replace(old, new)
+        results.append({"old": old, "new": new, "delta": len(new) - len(old)})
+    return xml, results
