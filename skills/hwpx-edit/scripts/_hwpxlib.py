@@ -154,7 +154,9 @@ def apply_replacements(xml, pairs):
     return xml, results
 
 
-_IMGDIM = re.compile(r'<hp:imgDim\s+dimwidth="(\d+)"\s+dimheight="(\d+)"')
+_IMGDIM_TAG = re.compile(r'<hp:imgDim\b[^>]*>')
+_DIMWIDTH = re.compile(r'dimwidth="(\d+)"')
+_DIMHEIGHT = re.compile(r'dimheight="(\d+)"')
 
 
 def png_dimensions(data):
@@ -166,7 +168,13 @@ def png_dimensions(data):
 
 
 def img_dims(xml):
-    return [(int(w), int(h)) for w, h in _IMGDIM.findall(xml)]
+    out = []
+    for tag in _IMGDIM_TAG.findall(xml):
+        w = _DIMWIDTH.search(tag)
+        h = _DIMHEIGHT.search(tag)
+        if w and h:
+            out.append((int(w.group(1)), int(h.group(1))))
+    return out
 
 
 def clone_equation(xml, template_script, anchor):

@@ -19,3 +19,10 @@ def test_clone_equation_fresh_id():
 def test_clone_equation_bad_template():
     with pytest.raises(ValueError):
         lib.clone_equation(SECTION_XML, "no such script", "로 끝난다.")
+
+
+def test_img_dims_both_attribute_orders():
+    a = '<hp:imgDim dimwidth="1800000" dimheight="1440000"/>'
+    b = '<hp:imgDim dimheight="1440000" dimwidth="1800000"/>'
+    assert lib.img_dims(a) == [(1800000, 1440000)]
+    assert lib.img_dims(b) == [(1800000, 1440000)]
