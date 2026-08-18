@@ -285,7 +285,11 @@ def apply_paragraph_corrections(xml, corrections):
 
     order = sorted(range(len(plan)), key=lambda i: plan[i][0])
     for j in range(1, len(order)):
-        if plan[order[j]][0] < plan[order[j - 1]][1]:
+        curr_start, curr_end, _ = plan[order[j]]
+        prev_start, prev_end, _ = plan[order[j - 1]]
+        if curr_start == prev_start and curr_end == prev_end:
+            raise ValueError("ambiguous: same text matched by multiple corrections")
+        elif curr_start < prev_end:
             raise ValueError("overlapping corrections in the same region")
 
     out = xml

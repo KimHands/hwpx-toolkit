@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent
                        / "skills" / "hwpx-edit" / "scripts"))
@@ -37,9 +38,6 @@ def test_t_nodes_point_at_real_body_text():
     joined = "".join(SECTION_XML[a:b] for a, b in paras[1]["t_nodes"])
     assert "앵커 본문" in joined
     assert "이건 메모 주석이다" not in joined
-
-
-import pytest
 
 
 def test_apply_single_node_correction():
@@ -107,6 +105,14 @@ def test_apply_rejects_overlapping():
                   {"p": 0, "old": "bcd", "new": "2"}])
 
 
+def test_apply_rejects_identical_span_ambiguous():
+    # same paragraph + same old (different new) target the identical span → ambiguous, rejected.
+    with pytest.raises(ValueError):
+        lib.apply_paragraph_corrections(
+            SECTION_XML, [{"p": 0, "old": "첫 문단 본문이다.", "new": "A"},
+                          {"p": 0, "old": "첫 문단 본문이다.", "new": "B"}])
+
+
 def test_apply_input_validation():
     with pytest.raises(ValueError):   # empty
         lib.apply_paragraph_corrections(SECTION_XML, [])
@@ -124,3 +130,5 @@ def test_apply_input_validation():
         lib.apply_paragraph_corrections(SECTION_XML, [{"p": -1, "old": "x", "new": "y"}])
     with pytest.raises(ValueError):   # bool/float p
         lib.apply_paragraph_corrections(SECTION_XML, [{"p": True, "old": "x", "new": "y"}])
+    with pytest.raises(ValueError):   # float p
+        lib.apply_paragraph_corrections(SECTION_XML, [{"p": 1.0, "old": "x", "new": "y"}])
