@@ -46,3 +46,62 @@ def paragraph_texts(xml, eq_marker="⟨식⟩"):
 
 def list_equations(xml):
     return collections.Counter(_SCRIPT.findall(xml))
+
+
+import xml.dom.minidom as _minidom
+
+_LINESEG = re.compile(r'<hp:linesegarray>.*?</hp:linesegarray>', re.S)
+_LINESEG_SELF = re.compile(r'<hp:linesegarray\s*/>')
+_FIELDBEGIN_TYPE = re.compile(r'<hp:fieldBegin[^>]*type="([A-Z]+)"')
+_EQ_ID = re.compile(r'<hp:equation\s+id="(\d+)"')
+
+
+def strip_linesegarray(xml):
+    xml = _LINESEG.sub("", xml)
+    xml = _LINESEG_SELF.sub("", xml)
+    return xml
+
+
+def is_wellformed(xml):
+    try:
+        _minidom.parseString(xml)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError("XML is not well-formed: %s" % exc)
+    return True
+
+
+def repackage(original_path, out_path, replacements):
+    with zipfile.ZipFile(original_path, "r") as zin, \
+            zipfile.ZipFile(out_path, "w") as zout:
+        for item in zin.infolist():
+            data = replacements.get(item.filename)
+            if data is None:
+                data = zin.read(item.filename)
+            zi = zipfile.ZipInfo(item.filename, date_time=item.date_time)
+            zi.compress_type = item.compress_type
+            zi.external_attr = item.external_attr
+            zi.internal_attr = item.internal_attr
+            zi.create_system = item.create_system
+            zout.writestr(zi, data)
+
+
+def verify(hwpx_path):
+    xml = read_section(hwpx_path)
+    try:
+        wellformed = is_wellformed(xml)
+    except ValueError:
+        wellformed = False
+    types = _FIELDBEGIN_TYPE.findall(xml)
+    ids = _EQ_ID.findall(xml)
+    seen, dup = set(), []
+    for i in ids:
+        if i in seen:
+            dup.append(i)
+        seen.add(i)
+    return {
+        "wellformed": wellformed,
+        "linesegarray": len(_LINESEG.findall(xml)) + len(_LINESEG_SELF.findall(xml)),
+        "memo_fields": types.count("MEMO"),
+        "hyperlink_fields": types.count("HYPERLINK"),
+        "dup_equation_ids": dup,
+    }
