@@ -4,6 +4,7 @@ __version__ = "0.1.0"
 import re
 import zipfile
 import collections
+import struct
 
 SECTION_PATH = "Contents/section0.xml"
 
@@ -151,3 +152,34 @@ def apply_replacements(xml, pairs):
         xml = xml.replace(old, new)
         results.append({"old": old, "new": new, "delta": len(new) - len(old)})
     return xml, results
+
+
+_IMGDIM = re.compile(r'<hp:imgDim\s+dimwidth="(\d+)"\s+dimheight="(\d+)"')
+
+
+def png_dimensions(data):
+    # PNG signature (8) + length(4) + "IHDR"(4) then width(4), height(4)
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("not a PNG")
+    width, height = struct.unpack(">II", data[16:24])
+    return width, height
+
+
+def img_dims(xml):
+    return [(int(w), int(h)) for w, h in _IMGDIM.findall(xml)]
+
+
+def clone_equation(xml, template_script, anchor):
+    m = re.search(
+        r'<hp:equation\b[^>]*>(?:(?!</hp:equation>).)*?<hp:script>'
+        + re.escape(template_script)
+        + r'</hp:script>.*?</hp:equation>', xml, re.S)
+    if not m:
+        raise ValueError("template equation not found: %r" % template_script)
+    if xml.count(anchor) != 1:
+        raise ValueError("anchor not unique: %r" % anchor)
+    existing = [int(i) for i in _EQ_ID.findall(xml)]
+    new_id = (max(existing) + 1) if existing else 1
+    clone = re.sub(r'(<hp:equation\s+id=")\d+(")',
+                   r'\g<1>%d\g<2>' % new_id, m.group(0), count=1)
+    return xml.replace(anchor, clone + anchor, 1)
