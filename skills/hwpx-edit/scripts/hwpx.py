@@ -5,6 +5,7 @@ All write subcommands: never modify input in place; strip linesegarray on
 text changes; verify well-formed; repackage via structure-clone.
 """
 import argparse
+import json
 import sys
 
 import _hwpxlib as lib
@@ -65,6 +66,39 @@ def cmd_edit(a):
         print("(--check: no file written)")
         return 0
     new_xml = lib.strip_linesegarray(new_xml)
+    _write(a.file, a.out, new_xml)
+    print("wrote %s" % a.out)
+    return 0
+
+
+def cmd_proofread_apply(a):
+    xml = lib.read_section(a.file)
+    try:
+        with open(a.corrections, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print("error: --from file not found: %s" % a.corrections,
+              file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print("error: invalid JSON: %s" % exc, file=sys.stderr)
+        return 2
+    if not isinstance(data, list):
+        print("error: corrections JSON must be an array", file=sys.stderr)
+        return 2
+    try:
+        new_xml, results = lib.apply_paragraph_corrections(xml, data)
+    except (ValueError, KeyError, TypeError) as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 2
+    for r in results:
+        print("delta %+d  p%d  %r -> %r"
+              % (r["delta"], r["p"], r["old"][:30], r["new"][:30]))
+    new_xml = lib.strip_linesegarray(new_xml)
+    lib.is_wellformed(new_xml)
+    if a.check:
+        print("(--check: no file written)")
+        return 0
     _write(a.file, a.out, new_xml)
     print("wrote %s" % a.out)
     return 0
@@ -165,6 +199,16 @@ def build_parser():
     rp.add_argument("--replace", action="append", default=[],
                     help="arcname=path (repeatable)")
     rp.set_defaults(func=cmd_repackage)
+
+    pr = sub.add_parser("proofread")
+    prsub = pr.add_subparsers(dest="pcmd", required=True)
+    pa = prsub.add_parser("apply")
+    pa.add_argument("file")
+    pa.add_argument("-o", "--out", required=True)
+    pa.add_argument("--from", dest="corrections", required=True,
+                    help="path to JSON array of {p, old, new}")
+    pa.add_argument("--check", action="store_true")
+    pa.set_defaults(func=cmd_proofread_apply)
     return p
 
 

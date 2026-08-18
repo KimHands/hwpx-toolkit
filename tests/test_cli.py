@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 import zipfile
@@ -77,3 +78,52 @@ def test_figure_swap(tmp_path):
     # SRC must be unchanged
     with zipfile.ZipFile(src) as z:
         assert z.read("BinData/image1.png") == PNG_1x1
+
+
+def test_proofread_apply(tmp_path):
+    src = make_hwpx(tmp_path)
+    corr = tmp_path / "c.json"
+    corr.write_text(json.dumps(
+        [{"p": 0, "old": "첫 문단 본문이다.", "new": "첫 문단 본문이 늘었다."}]),
+        encoding="utf-8")
+    out = str(tmp_path / "pf.hwpx")
+    r = run("proofread", "apply", src, "-o", out, "--from", str(corr))
+    assert r.returncode == 0
+    xml = zipfile.ZipFile(out).read("Contents/section0.xml").decode("utf-8")
+    assert "첫 문단 본문이 늘었다." in xml
+    assert "<hp:linesegarray" not in xml           # stripped
+    # 입력 파일은 불변.
+    src_xml = zipfile.ZipFile(src).read("Contents/section0.xml").decode("utf-8")
+    assert "첫 문단 본문이다." in src_xml
+
+
+def test_proofread_check_writes_nothing(tmp_path):
+    src = make_hwpx(tmp_path)
+    corr = tmp_path / "c.json"
+    corr.write_text(json.dumps(
+        [{"p": 0, "old": "첫 문단 본문이다.", "new": "바뀐 문단이다."}]),
+        encoding="utf-8")
+    out = str(tmp_path / "nope.hwpx")
+    r = run("proofread", "apply", src, "-o", out, "--from", str(corr), "--check")
+    assert r.returncode == 0
+    assert not Path(out).exists()
+
+
+def test_proofread_missing_from_file(tmp_path):
+    src = make_hwpx(tmp_path)
+    out = str(tmp_path / "x.hwpx")
+    r = run("proofread", "apply", src, "-o", out, "--from",
+            str(tmp_path / "absent.json"))
+    assert r.returncode == 2
+    assert not Path(out).exists()
+
+
+def test_proofread_bad_match_exits_2(tmp_path):
+    src = make_hwpx(tmp_path)
+    corr = tmp_path / "c.json"
+    corr.write_text(json.dumps([{"p": 0, "old": "존재하지않음", "new": "x"}]),
+                    encoding="utf-8")
+    out = str(tmp_path / "x.hwpx")
+    r = run("proofread", "apply", src, "-o", out, "--from", str(corr))
+    assert r.returncode == 2
+    assert not Path(out).exists()
