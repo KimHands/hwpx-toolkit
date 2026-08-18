@@ -238,3 +238,57 @@ def enumerate_body_paragraphs(xml, eq_marker="⟨식⟩"):
                 t_nodes.append((a, b))
         out.append({"index": idx, "display": display, "t_nodes": t_nodes})
     return out
+
+
+def apply_paragraph_corrections(xml, corrections):
+    if not corrections:
+        raise ValueError("no corrections given")
+    seen = set()
+    for c in corrections:
+        p, old, new = c["p"], c["old"], c["new"]
+        if isinstance(p, bool) or not isinstance(p, int):
+            raise ValueError("p must be an integer: %r" % (p,))
+        if old == "":
+            raise ValueError("old must be non-empty")
+        if old == new:
+            raise ValueError("old == new (no-op): %r" % (old,))
+        key = (p, old, new)
+        if key in seen:
+            raise ValueError("duplicate correction: %r" % (key,))
+        seen.add(key)
+
+    paras = enumerate_body_paragraphs(xml)
+    n = len(paras)
+    plan = []      # (match_start, match_end, new)
+    results = []   # input order
+    for c in corrections:
+        p, old, new = c["p"], c["old"], c["new"]
+        if p < 0 or p >= n:
+            raise ValueError(
+                "paragraph index out of range: %d (have %d)" % (p, n))
+        node = None
+        total = 0
+        for a, b in paras[p]["t_nodes"]:
+            cnt = xml[a:b].count(old)
+            total += cnt
+            if cnt == 1 and node is None:
+                node = (a, b)
+        if total != 1 or node is None:
+            raise ValueError(
+                "anchor not unique in paragraph %d (count=%d): %r"
+                % (p, total, old))
+        a, b = node
+        ms = a + xml[a:b].index(old)
+        plan.append((ms, ms + len(old), new))
+        results.append({"p": p, "old": old, "new": new,
+                        "delta": len(new) - len(old)})
+
+    order = sorted(range(len(plan)), key=lambda i: plan[i][0])
+    for j in range(1, len(order)):
+        if plan[order[j]][0] < plan[order[j - 1]][1]:
+            raise ValueError("overlapping corrections in the same region")
+
+    out = xml
+    for ms, me, new in sorted(plan, key=lambda t: -t[0]):
+        out = out[:ms] + _xml_escape(new) + out[me:]
+    return out, results
