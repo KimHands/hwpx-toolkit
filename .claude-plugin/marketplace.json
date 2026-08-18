@@ -1,0 +1,7 @@
+{
+  "name": "hwpx-toolkit",
+  "owner": { "name": "KimJongGun" },
+  "plugins": [
+    { "name": "hwpx-edit", "source": "./", "description": "HWPX read/edit skill + CLI" }
+  ]
+}
