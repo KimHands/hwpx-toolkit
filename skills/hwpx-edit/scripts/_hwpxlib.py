@@ -6,6 +6,7 @@ import zipfile
 import collections
 import struct
 from pathlib import Path
+from xml.sax.saxutils import escape as _xml_escape
 
 SECTION_PATH = "Contents/section0.xml"
 
@@ -198,3 +199,100 @@ def clone_equation(xml, template_script, anchor):
     clone = re.sub(r'(<hp:equation\s+id=")\d+(")',
                    r'\g<1>%d\g<2>' % new_id, m.group(0), count=1)
     return xml.replace(anchor, clone + anchor, 1)
+
+
+def _memo_spans(xml):
+    return [(m.start(), m.end()) for m in _MEMO_SUBLIST.finditer(xml)]
+
+
+def _mask_memos(xml):
+    spans = _memo_spans(xml)
+    if not spans:
+        return xml
+    chars = list(xml)
+    for s, e in spans:
+        for i in range(s, e):
+            chars[i] = "#"
+    return "".join(chars)
+
+
+def enumerate_body_paragraphs(xml, eq_marker="⟨식⟩"):
+    masked = _mask_memos(xml)
+    mspans = _memo_spans(xml)
+    out = []
+    idx = -1
+    for pm in _P.finditer(masked):
+        s, e = pm.start(), pm.end()
+        region = xml[s:e]
+        body = strip_memo_sublists(region)
+        body = _EQUATION.sub(f"<hp:t>{eq_marker}</hp:t>", body)
+        display = "".join(_T.findall(body)).strip()
+        if not display:
+            continue
+        idx += 1
+        t_nodes = []
+        for tm in _T.finditer(region):
+            a = s + tm.start(1)
+            b = s + tm.end(1)
+            if not any(a < me and b > ms for ms, me in mspans):
+                t_nodes.append((a, b))
+        out.append({"index": idx, "display": display, "t_nodes": t_nodes})
+    return out
+
+
+def apply_paragraph_corrections(xml, corrections):
+    if not corrections:
+        raise ValueError("no corrections given")
+    seen = set()
+    for c in corrections:
+        p, old, new = c["p"], c["old"], c["new"]
+        if isinstance(p, bool) or not isinstance(p, int):
+            raise ValueError("p must be an integer: %r" % (p,))
+        if old == "":
+            raise ValueError("old must be non-empty")
+        if old == new:
+            raise ValueError("old == new (no-op): %r" % (old,))
+        key = (p, old, new)
+        if key in seen:
+            raise ValueError("duplicate correction: %r" % (key,))
+        seen.add(key)
+
+    paras = enumerate_body_paragraphs(xml)
+    n = len(paras)
+    plan = []      # (match_start, match_end, new)
+    results = []   # input order
+    for c in corrections:
+        p, old, new = c["p"], c["old"], c["new"]
+        if p < 0 or p >= n:
+            raise ValueError(
+                "paragraph index out of range: %d (have %d)" % (p, n))
+        node = None
+        total = 0
+        for a, b in paras[p]["t_nodes"]:
+            cnt = xml[a:b].count(old)
+            total += cnt
+            if cnt == 1 and node is None:
+                node = (a, b)
+        if total != 1 or node is None:
+            raise ValueError(
+                "anchor not unique in paragraph %d (count=%d): %r"
+                % (p, total, old))
+        a, b = node
+        ms = a + xml[a:b].index(old)
+        plan.append((ms, ms + len(old), new))
+        results.append({"p": p, "old": old, "new": new,
+                        "delta": len(new) - len(old)})
+
+    order = sorted(range(len(plan)), key=lambda i: plan[i][0])
+    for j in range(1, len(order)):
+        curr_start, curr_end, _ = plan[order[j]]
+        prev_start, prev_end, _ = plan[order[j - 1]]
+        if curr_start == prev_start and curr_end == prev_end:
+            raise ValueError("ambiguous: same text matched by multiple corrections")
+        elif curr_start < prev_end:
+            raise ValueError("overlapping corrections in the same region")
+
+    out = xml
+    for ms, me, new in sorted(plan, key=lambda t: -t[0]):
+        out = out[:ms] + _xml_escape(new) + out[me:]
+    return out, results
