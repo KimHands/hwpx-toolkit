@@ -39,7 +39,7 @@ HWPX는 OWPML XML을 담은 ZIP 컨테이너다. 손대면 위험한 함정이 �
 3장이랑 4장 순서 바꾸고 참고문헌 appearance 순으로 다시 번호 매겨줘
 ```
 
-슬래시 메뉴에서 직접 고를 수도 있다: `/` 를 누르고 `hwpx` 를 입력하면 목록에 뜬다. 뜨는 이름은 설치 방식에 따라 다르다 — **플러그인으로 설치하면 네임스페이스가 붙어 `hwpx-edit:hwpx-edit` 형태**로, 개인 스킬(`~/.claude/skills/hwpx-edit/`)로 두면 `/hwpx-edit` 로 나타난다. (정확한 문자열을 외울 필요 없이 `/hwpx` 로 찾으면 된다.)
+슬래시 메뉴에서 직접 고를 수도 있다: `/` 를 누르고 `hwpx` 를 입력하면 목록에 뜬다. 뜨는 이름은 설치 방식에 따라 다르다 — **플러그인으로 설치하면 네임스페이스가 붙어 `hwpx-toolkit:hwpx-edit` 형태**로, 개인 스킬(`~/.claude/skills/hwpx-edit/`)로 두면 `/hwpx-edit` 로 나타난다. (정확한 문자열을 외울 필요 없이 `/hwpx` 로 찾으면 된다.)
 
 그러면 Claude가 알아서: 본문·문단을 읽고 → 교정·편집안을 만들고 → 문단 스코프로 안전하게 적용하고 → 검증한 뒤 **새 파일로 저장**한다. 원본은 절대 덮어쓰지 않는다. 편집이 끝나면 한글(HWP)로 열어 레이아웃을 확인하라고 안내한다(양성 "변조 가능성" 경고가 나타날 수 있음).
 
@@ -47,7 +47,7 @@ HWPX는 OWPML XML을 담은 ZIP 컨테이너다. 손대면 위험한 함정이 �
 
 ```
 /plugin marketplace add KimHands/hwpx-toolkit
-/plugin install hwpx-edit
+/plugin install hwpx-toolkit
 ```
 
 ### 설치 — Codex

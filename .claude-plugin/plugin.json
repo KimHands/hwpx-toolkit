@@ -1,6 +1,6 @@
 {
-  "name": "hwpx-edit",
-  "version": "0.1.0",
-  "description": "Safely read and edit 한글(HWPX) files: memo removal, char-delta text edits, figure swap, equation clone — via a structure-preserving CLI.",
+  "name": "hwpx-toolkit",
+  "version": "0.2.0",
+  "description": "Safely read and edit 한글(HWPX) files: spelling/wording proofread, memo removal, char-delta edits, figure swap, equation clone — a structure-preserving CLI plus a guided task-selection flow.",
   "author": { "name": "KimJongGun" }
 }

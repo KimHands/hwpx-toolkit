@@ -2,6 +2,6 @@
   "name": "hwpx-toolkit",
   "owner": { "name": "KimJongGun" },
   "plugins": [
-    { "name": "hwpx-edit", "source": "./", "description": "HWPX read/edit skill + CLI" }
+    { "name": "hwpx-toolkit", "source": "./", "description": "HWPX safe read/edit skill + CLI (proofread, memo, edit, figure, equation) and guided flow" }
   ]
 }
