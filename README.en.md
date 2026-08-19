@@ -25,7 +25,7 @@ The split is deliberate — **the scripts do the deterministic work** (repackage
 
 ## Usage — Claude Code (primary)
 
-Once the plugin is installed you **don't run the CLI yourself.** Just describe the task in the Claude Code chat and the `hwpx-edit` skill activates and runs the toolkit safely. To invoke it explicitly, type **`/hwpx-edit`** in the chat.
+Once the plugin is installed you **don't run the CLI yourself.** Just describe the task in the Claude Code chat (natural language) and the `hwpx-edit` skill activates and runs the toolkit safely — this is the most reliable way.
 
 Type things like:
 
@@ -38,9 +38,8 @@ remove all the memos and save as v2
 ```
 swap chapters 3 and 4 and renumber the references in appearance order
 ```
-```
-/hwpx-edit   (invoke the skill explicitly)
-```
+
+You can also pick it from the slash menu: press `/` and type `hwpx`. The exact name depends on how it was installed — **as a plugin it is namespaced, e.g. `hwpx-edit:hwpx-edit`**; as a personal skill (`~/.claude/skills/hwpx-edit/`) it shows as `/hwpx-edit`. (No need to memorize the string — just find it by typing `/hwpx`.)
 
 Claude then reads the body/paragraphs, drafts the corrections/edits, applies them safely at paragraph scope, verifies, and **saves to a new file** — the original is never overwritten. When done it tells you to open the file in HWP to eyeball the layout (a benign "변조 가능성" warning may appear).
 
