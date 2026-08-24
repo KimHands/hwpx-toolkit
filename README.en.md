@@ -1,96 +1,192 @@
 <!-- 한국어: [README.md](README.md) | English: this file -->
 
-# hwpx-toolkit
+<div align="center">
 
-Safely read and edit 한글(HWPX) files — without corrupting the ZIP structure or triggering text overlap. Packaged as a Claude Code plugin and Codex skill. (MIT)
+# 📝 hwpx-toolkit
 
-## What it is
+**Safely read and edit 한글(HWPX) files — a Claude Code · Codex skill**
 
-HWPX is a ZIP container of OWPML XML. Two pitfalls make naive editing dangerous: HWP refuses to open a carelessly rebuilt ZIP, and stale line-position caches cause text to render on top of itself. This skill handles both automatically.
+*.hwpx is a fragile ZIP structure: save it carelessly and HWP won't open the file.*
+*This skill repackages by cloning the structure and prevents text overlap, so you edit safely — just by talking.*
 
-The split is deliberate — **the scripts do the deterministic work** (repackage, extract, uniqueness checks, char deltas, strip, verify) and **the model (Claude) does the language judgment** (finding errors, wording corrections, choosing anchors).
+![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)
+![deps](https://img.shields.io/badge/deps-stdlib_only-success)
+![Claude Code](https://img.shields.io/badge/Claude_Code-plugin-8A63D2)
+![Codex](https://img.shields.io/badge/Codex-skill-000000)
+![Tests](https://img.shields.io/badge/tests-43_passing-success)
+![License](https://img.shields.io/badge/License-MIT-black)
 
-### What it can do
+</div>
 
-| Task | Description |
-|---|---|
-| Read body/memo/equation | extract body paragraphs, reviewer memos, or equation scripts |
-| Clear memos | remove all reviewer memos, keep body and hyperlinks |
-| Char-delta edit | replace text by unique anchor with per-replacement char-delta (widow/orphan fixes) |
-| **Spelling/wording proofread** | apply paragraph-scoped corrections safely |
-| Figure swap | replace an embedded PNG by slot name (aspect match) |
-| Equation clone | restore a subscript term as an `<hp:equation>` object |
-| Verify | structural gate before handing off the file |
-| Guided flow | pick operations from a checklist and chain them in one pass |
+> **Scope positioning** — hwpx-toolkit does **not** author new documents or convert to PDF/docx.
+> It **edits an existing `.hwpx` safely and saves a new version**. The original is never touched.
 
-## Usage — Claude Code (primary)
+---
 
-Once the plugin is installed you **don't run the CLI yourself.** Just describe the task in the Claude Code chat (natural language) and the `hwpx-edit` skill activates and runs the toolkit safely — this is the most reliable way.
+## ✨ Features
 
-Type things like:
+- **Spelling/wording proofread** — paragraph-scoped corrections on body text only; surrounding entities and markup are preserved byte-for-byte
+- **Clear reviewer memos** — remove all memos while keeping body text and hyperlinks
+- **Char-delta edit** — replace text by unique anchor and report the exact character delta (widow/orphan fixes)
+- **Figure swap · equation clone** — replace an embedded PNG by slot name, restore a subscript term as an `<hp:equation>` object
+- **Read / verify** — extract body, memos, equations; structural gate before handing off
+- **Guided task-selection flow** — pick operations from a checklist and chain them in one pass
+- **Scripts = deterministic, model = judgment** — repackage/verify/char-deltas by scripts; error-finding and wording by the model
+
+---
+
+## 💬 Usage — Claude Code
+
+Once installed, you **don't run the CLI yourself.** Just describe the task in the chat (natural language) and the `hwpx-edit` skill activates — the most reliable way.
 
 ```
 fix the typos in this paper.hwpx
-```
-```
 remove all the memos and save as v2
-```
-```
 swap chapters 3 and 4 and renumber the references in appearance order
 ```
 
-You can also pick it from the slash menu: press `/` and type `hwpx`. The exact name depends on how it was installed — **as a plugin it is namespaced, e.g. `hwpx-toolkit:hwpx-edit`**; as a personal skill (`~/.claude/skills/hwpx-edit/`) it shows as `/hwpx-edit`. (No need to memorize the string — just find it by typing `/hwpx`.)
+You can also pick it from the slash menu — press `/` and type `hwpx`. The name depends on install method: as a plugin it is **`hwpx-toolkit:hwpx-edit`**; as a personal skill (`~/.claude/skills/hwpx-edit/`) it shows as `/hwpx-edit`.
 
-Claude then reads the body/paragraphs, drafts the corrections/edits, applies them safely at paragraph scope, verifies, and **saves to a new file** — the original is never overwritten. When done it tells you to open the file in HWP to eyeball the layout (a benign "변조 가능성" warning may appear).
+Claude then reads the body/paragraphs, drafts the edits, applies them safely at paragraph scope, verifies, and **saves to a new file**. When done it tells you to open the file in HWP to eyeball the layout (a benign "변조 가능성" warning may appear).
 
-### Install — Claude Code
+---
+
+## 🛡 Safety guarantees
+
+However the edit is triggered, these always hold.
+
+| Rule | What it means |
+|------|---------------|
+| Never in-place | Always writes a new file (`-o`); the original is never modified |
+| Structure-clone repackaging | `mimetype` first · STORED compression · no directory entries. Shell `zip` is never used |
+| linesegarray stripped | Stale line caches removed on every text change → HWP recomputes layout (no text overlap) |
+| Well-formed check | XML validated before the output is written |
+| Unique anchors | A replacement matching more than once is refused; proofread requires uniqueness within a paragraph and a single `<hp:t>` run |
+| Text-coordinate only | Matches/replaces only inside body `<hp:t>`; only the replacement is escaped → entities preserved byte-for-byte, no markup injection |
+
+---
+
+## 🗂 Repository layout
+
+```
+hwpx-toolkit/
+├── skills/hwpx-edit/
+│   ├── SKILL.md                skill definition the model loads (triggers, guidance)
+│   ├── scripts/
+│   │   ├── hwpx.py             unified CLI (extract·memo·edit·proofread·figure·equation·verify·repackage)
+│   │   └── _hwpxlib.py         stdlib-only core library
+│   └── references/
+│       ├── hwpx-internals.md   OWPML/HWPX internals notes
+│       └── workflows.md        per-task recipes (proofread, memo, figure, equation, guided flow)
+├── tests/                      pytest — 43 (unit + CLI E2E)
+├── docs/superpowers/           design specs and implementation plans
+├── .claude-plugin/             Claude Code plugin manifests (plugin/marketplace)
+├── codex/install.md            Codex install guide
+└── README.md · README.en.md · LICENSE · AGENTS.md · CLAUDE.md
+```
+
+The runtime uses **pure Python 3.9+ standard library** only (zero third-party deps, no network/outbound). pytest is a test-only dependency.
+
+---
+
+## 🧰 CLI subcommands
+
+The CLI the skill uses under the hood — also runnable directly for automation/debugging. Every write command saves to a new `-o` file.
+
+| Command | Purpose | Notes |
+|---------|---------|-------|
+| `extract FILE [--paragraphs\|--memos\|--equations]` | read body paragraphs · memos · equation scripts | paragraphs print as `[0] …` |
+| `memo clear FILE -o OUT` | remove all reviewer memos | keeps body + hyperlinks |
+| `edit FILE -o OUT --replace "old<TAB>new" [--check]` | unique-anchor replace + char delta | `--check` to preview |
+| `proofread apply FILE -o OUT --from c.json [--check]` | paragraph-scoped spelling/wording | `c.json` = `[{"p":3,"old":"됬다","new":"됐다"}]` |
+| `figure swap FILE -o OUT --slot imageN --png P` | replace embedded PNG | prints aspect ratios |
+| `equation clone FILE -o OUT --template "..." --anchor "..."` | restore a subscript equation | assigns a fresh id |
+| `verify FILE` | structural gate | reports wellformed · memo/equation counts |
+| `repackage --original F -o OUT --replace arc=path` | (low-level) rebuild from an archive entry | structure-clone |
+
+---
+
+## 🔄 Proofread flow
+
+```
+extract --paragraphs            read numbered paragraphs
+        ↓
+model finds errors  →  corrections.json  [{ "p", "old", "new" }, ...]
+        ↓
+proofread apply --check         paragraph-scoped validation + char-delta preview (no file)
+        ↓
+proofread apply                 splice only the matched <hp:t> span · escape only `new`
+        ↓
+strip linesegarray → well-formed check → structure-clone repackage → new file
+        ↓
+verify → open in HWP to check layout
+```
+
+If `old` is not unique within its paragraph, or spans multiple `<hp:t>` runs, it **fails safely** → retry with a shorter word-level anchor. See `docs/superpowers/specs/2026-08-18-proofread-and-guided-flow-design.md`.
+
+---
+
+## 🚀 Install
+
+### Claude Code
 
 ```
 /plugin marketplace add KimHands/hwpx-toolkit
 /plugin install hwpx-toolkit
 ```
 
-### Install — Codex
+### Codex
 
 See [`codex/install.md`](codex/install.md). Codex surfaces the same `hwpx-edit` skill; use it conversationally the same way.
 
-## Safety guarantees
-
-However the edit is triggered, these always hold:
-
-1. **Never in-place** — always write to a new file. The original is never touched.
-2. **Structure-clone repackaging** — `mimetype` entry first, STORED compression, no directory entries. Shell `zip` is never used.
-3. **linesegarray stripped** — stale line caches removed on every text change so HWP recomputes clean layout.
-4. **Well-formed check** — XML is validated before the output file is written.
-5. **Unique anchors** — a replacement whose anchor matches more than once is refused; proofread requires each `old` to be unique within its paragraph and inside a single text run.
-6. **Text-coordinate only** — proofread matches/replaces only inside body text and escapes only the replacement, so surrounding entities are preserved byte-for-byte and markup can never be injected. Anchors never span an `<hp:equation>` or a `&gt;` escape.
-
-## Running the CLI directly (optional · automation/contributors)
-
-The CLI the skill uses under the hood can also be run directly:
+### Run directly (optional)
 
 ```bash
-# read numbered paragraphs
 python3 skills/hwpx-edit/scripts/hwpx.py extract paper.hwpx --paragraphs
-
-# proofread: corrections.json = [{"p":3,"old":"됬다","new":"됐다"}]
-python3 skills/hwpx-edit/scripts/hwpx.py proofread apply paper.hwpx -o paper_v2.hwpx --from corrections.json --check  # preview
-python3 skills/hwpx-edit/scripts/hwpx.py proofread apply paper.hwpx -o paper_v2.hwpx --from corrections.json          # apply
-
-python3 skills/hwpx-edit/scripts/hwpx.py memo clear draft.hwpx -o draft_clean.hwpx
+python3 skills/hwpx-edit/scripts/hwpx.py proofread apply paper.hwpx -o paper_v2.hwpx --from corrections.json --check
+python3 skills/hwpx-edit/scripts/hwpx.py proofread apply paper.hwpx -o paper_v2.hwpx --from corrections.json
 python3 skills/hwpx-edit/scripts/hwpx.py verify paper_v2.hwpx
 ```
 
-Subcommands: `extract` · `memo clear` · `edit` · `proofread apply` · `figure swap` · `equation clone` · `verify` · `repackage`.
+---
 
-## For contributors
+## 🧪 Tests
+
+Run the full suite with the project venv (macOS system Python is externally managed, PEP 668, so `.venv/` is canonical).
 
 ```bash
-.venv/bin/pytest -v
+python3 -m venv .venv && .venv/bin/pip install pytest   # first time
+.venv/bin/pytest -v                                      # all 43 must pass
 ```
 
-The project venv at `.venv/` is the canonical test environment (macOS system Python is externally managed, PEP 668). Recreate with `python3 -m venv .venv && .venv/bin/pip install pytest` if missing. All 43 tests must pass; runtime is pure Python 3.9+ stdlib.
+The runtime needs only Python 3.9+ stdlib; only the tests depend on pytest.
 
-## License
+---
 
-MIT — see [LICENSE](LICENSE).
+## ⚠️ Out of scope · caveats
+
+- Authoring new documents, or converting to PDF/docx/pptx — not what this tool does
+- Overwriting the original — always saves a new version
+- Using an `<hp:equation>` or a `&gt;` escape as an anchor — forbidden (model guidance)
+- Anchors spanning multiple `<hp:t>` runs — unsupported (safe fail, then retry)
+- The environment can't render HWPX, so **open the file in HWP** to confirm layout after editing
+
+---
+
+## 📚 Docs
+
+| File | Contents |
+|------|----------|
+| `skills/hwpx-edit/SKILL.md` | skill definition · triggers · model guidance |
+| `skills/hwpx-edit/references/hwpx-internals.md` | OWPML/HWPX internals notes |
+| `skills/hwpx-edit/references/workflows.md` | per-task recipes (proofread, memo, figure, equation, guided flow) |
+| `docs/superpowers/specs/` | design docs (with review revisions) |
+| `docs/superpowers/plans/` | TDD implementation plans |
+| `AGENTS.md` | project rules · safety invariants |
+| `README.md` | 한국어 README |
+
+---
+
+## 📄 License
+
+Released under the [MIT License](LICENSE).
