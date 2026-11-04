@@ -154,3 +154,48 @@ def test_proofread_bad_match_exits_2(tmp_path):
     r = run("proofread", "apply", src, "-o", out, "--from", str(corr))
     assert r.returncode == 2
     assert not Path(out).exists()
+
+
+def test_figure_swap_missing_slot_exits_2(tmp_path):
+    from conftest import PNG_1x1
+    src = make_hwpx(tmp_path)
+    png = tmp_path / "new.png"
+    png.write_bytes(PNG_1x1)
+    out = tmp_path / "x.hwpx"
+    r = run("figure", "swap", src, "-o", str(out), "--slot", "image99", "--png", str(png))
+    assert r.returncode == 2
+    assert "image99" in r.stderr
+    assert not out.exists()
+
+
+def test_repackage_malformed_xml_exits_2(tmp_path):
+    src = make_hwpx(tmp_path)
+    bad = tmp_path / "bad.xml"
+    bad.write_text("<broken", encoding="utf-8")
+    out = tmp_path / "x.hwpx"
+    r = run("repackage", "--original", src, "-o", str(out),
+            "--replace", "Contents/section0.xml=%s" % bad)
+    assert r.returncode == 2
+    assert not out.exists()
+
+
+def test_same_input_output_path_reports_error_without_traceback(tmp_path):
+    src = make_hwpx(tmp_path)
+    r = run("memo", "clear", src, "-o", src)
+    assert r.returncode == 2
+    assert r.stderr.startswith("error:")
+    assert "Traceback" not in r.stderr
+
+
+def test_missing_input_exits_2(tmp_path):
+    r = run("extract", str(tmp_path / "absent.hwpx"))
+    assert r.returncode == 2
+    assert "Traceback" not in r.stderr
+
+
+def test_non_zip_input_exits_2(tmp_path):
+    bad = tmp_path / "bad.hwpx"
+    bad.write_text("not a zip", encoding="utf-8")
+    r = run("extract", str(bad))
+    assert r.returncode == 2
+    assert "Traceback" not in r.stderr

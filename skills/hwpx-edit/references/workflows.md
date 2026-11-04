@@ -26,7 +26,7 @@ python3 skills/hwpx-edit/scripts/hwpx.py edit input.hwpx -o output_v2.hwpx \
 ```
 
 Notes:
-- The anchor must appear **exactly once** in the section XML — the CLI enforces this.
+- The anchor must appear **exactly once** in body `<hp:t>` text (memos and equations are excluded) — the CLI enforces this and escapes the new text.
 - Do NOT anchor across an `<hp:equation>` object or a `&gt;` escape sequence.
 - After writing, tell the author to open the new file in HWP and check layout visually; a "변조 가능성" warning is benign.
 

@@ -7,6 +7,7 @@ text changes; verify well-formed; repackage via structure-clone.
 import argparse
 import json
 import sys
+import zipfile
 
 import _hwpxlib as lib
 
@@ -219,7 +220,11 @@ def use_utf8_output():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except (ValueError, OSError, KeyError, zipfile.BadZipFile) as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
