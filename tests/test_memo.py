@@ -47,3 +47,9 @@ def test_remove_memos_reversed_attr_order():
     # No orphaned fieldEnd must remain
     assert 'beginIDRef="9001"' not in out
     assert lib.is_wellformed(out) is True
+
+
+def test_list_memos_reads_comment_from_sublist_with_attributes():
+    xml = SECTION_XML.replace(
+        "<hp:subList>", '<hp:subList id="" textDirection="HORIZONTAL">')
+    assert lib.list_memos(xml)[0]["comment"] == "이건 메모 주석이다"

@@ -44,3 +44,16 @@ def test_clone_equation_stays_outside_text_at_start_anchor():
     out = lib.clone_equation(SECTION_XML, "device _{key}", "첫 문단")
     assert '</hp:equation><hp:t>첫 문단 본문이다.</hp:t>' in out
     assert "<hp:t></hp:t>" not in out
+
+
+SECTION_XML_SCRIPT_ATTR = SECTION_XML.replace(
+    "<hp:script>", '<hp:script xml:space="preserve">')
+
+
+def test_list_equations_reads_script_with_attributes():
+    assert lib.list_equations(SECTION_XML_SCRIPT_ATTR)["device _{key}"] == 1
+
+
+def test_clone_equation_uses_template_script_with_attributes():
+    out = lib.clone_equation(SECTION_XML_SCRIPT_ATTR, "device _{key}", "로 끝난다.")
+    assert out.count("<hp:equation") == 2

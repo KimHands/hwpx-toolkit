@@ -15,7 +15,7 @@ _MEMO_SUBLIST = re.compile(
 _EQUATION = re.compile(r'<hp:equation\b.*?</hp:equation>', re.S)
 _T = re.compile(r'<hp:t>(.*?)</hp:t>', re.S)
 _P = re.compile(r'<hp:p\b.*?</hp:p>', re.S)
-_SCRIPT = re.compile(r'<hp:script>(.*?)</hp:script>', re.S)
+_SCRIPT = re.compile(r'<hp:script\b[^>]*>(.*?)</hp:script>', re.S)
 
 
 def read_section(hwpx_path):
@@ -141,7 +141,7 @@ def list_memos(xml):
         block = m.group(0)
         pid = _PARAM_ID.search(block)
         author = _PARAM_AUTHOR.search(block)
-        sub = re.search(r'<hp:subList>.*?</hp:subList>', block, re.S)
+        sub = re.search(r'<hp:subList\b[^>]*>.*?</hp:subList>', block, re.S)
         comment = "".join(_T.findall(sub.group(0))) if sub else ""
         out.append({
             "id": pid.group(1) if pid else "",
@@ -198,7 +198,7 @@ def img_dims(xml):
 
 def clone_equation(xml, template_script, anchor):
     m = re.search(
-        r'<hp:equation\b[^>]*>(?:(?!</hp:equation>).)*?<hp:script>'
+        r'<hp:equation\b[^>]*>(?:(?!</hp:equation>).)*?<hp:script\b[^>]*>'
         + re.escape(template_script)
         + r'</hp:script>.*?</hp:equation>', xml, re.S)
     if not m:
