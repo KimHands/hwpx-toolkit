@@ -55,3 +55,19 @@ def test_repackage_same_path_raises_and_preserves_original(tmp_path):
     with zipfile.ZipFile(src) as z:
         xml = z.read("Contents/section0.xml").decode("utf-8")
     assert "첫 문단 본문이다." in xml
+
+
+def test_repackage_rejects_malformed_xml_without_writing(tmp_path):
+    src = make_hwpx(tmp_path)
+    out = tmp_path / "out.hwpx"
+    with pytest.raises(ValueError, match="not well-formed"):
+        lib.repackage(src, str(out), {"Contents/section0.xml": b"<broken"})
+    assert not out.exists()
+
+
+def test_repackage_rejects_unknown_entry_without_writing(tmp_path):
+    src = make_hwpx(tmp_path)
+    out = tmp_path / "out.hwpx"
+    with pytest.raises(ValueError, match="BinData/image99.png"):
+        lib.repackage(src, str(out), {"BinData/image99.png": b"x"})
+    assert not out.exists()

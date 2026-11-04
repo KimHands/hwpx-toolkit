@@ -82,7 +82,8 @@ delta +1  p0  '본문이다' -> '본문입니다'
 | 요청 | 결과 |
 |------|------|
 | 문단에 없는 문구로 교정 | `error: anchor not unique in paragraph 1 (count=0)`, 종료 코드 2, 출력 파일 없음 |
-| 입력과 같은 경로로 저장 | `ValueError: out_path must differ from original_path`, 원본 해시 동일 |
+| 입력과 같은 경로로 저장 | `error: out_path must differ from original_path`, 종료 코드 2, 원본 해시 동일 |
+| 없는 그림 슬롯 교체 | `error: no such entry in archive`, 종료 코드 2, 출력 파일 없음 |
 
 ---
 
@@ -105,11 +106,9 @@ CLI가 강제하는 규칙입니다. 명령마다 적용 범위가 다르면 표
 | 원본 in-place 금지 | 항상 새 파일(`-o`)로 저장. 출력 경로가 입력과 같으면 거부 |
 | 구조 복제 재포장 | `mimetype` 최초 · STORED 압축 · 디렉터리 엔트리 0. 셸 `zip` 미사용 |
 | linesegarray 제거 | `memo clear`·`edit`·`proofread apply`·`equation clone`에서 오래된 줄 캐시를 모두 삭제 → 한글이 레이아웃을 다시 계산하도록 함 |
-| well-formed 검증 | 위 네 명령은 저장 전에 XML 유효성 검사. 저수준 `repackage`는 검사하지 않으므로 `verify`로 확인 |
+| well-formed 검증 | 위 네 명령은 저장 전에 XML 유효성 검사. `repackage`·`figure swap`은 교체 대상이 아카이브에 없으면 거부하고, 교체하는 XML·HPF 엔트리를 검사 |
 | 유일 앵커 | `edit`·`proofread apply`·`equation clone`은 앵커가 정확히 한 번 일치할 때만 적용. proofread는 문단 내 유일 + 단일 `<hp:t>` 런 강제 |
-| 본문 텍스트 좌표계 (`proofread`) | 본문 `<hp:t>` 안에서만 매칭·치환, 교정 문구만 이스케이프 → 엔티티 바이트 보존·마크업 주입 불가 |
-
-> `edit`은 섹션 XML 원문을 그대로 치환합니다. 수식 스크립트도 매칭될 수 있고 새 문구를 이스케이프하지 않으므로, 본문 교정에는 `proofread`를 쓰세요.
+| 본문 텍스트 좌표계 | `edit`·`proofread apply`·`equation clone`은 메모·수식을 제외한 본문 `<hp:t>` 안에서만 앵커를 찾음. `edit`·`proofread apply`는 새 문구를 이스케이프해 마크업이 그대로 들어가지 않음 |
 
 ---
 

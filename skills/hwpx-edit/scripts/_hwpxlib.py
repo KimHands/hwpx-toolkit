@@ -1,5 +1,5 @@
 """hwpx-toolkit core library (stdlib only)."""
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 import re
 import zipfile
@@ -57,6 +57,9 @@ _LINESEG = re.compile(r'<hp:linesegarray>.*?</hp:linesegarray>', re.S)
 _LINESEG_SELF = re.compile(r'<hp:linesegarray\s*/>')
 _FIELDBEGIN_TYPE = re.compile(r'<hp:fieldBegin[^>]*type="([A-Z]+)"')
 _EQ_ID = re.compile(r'<hp:equation\s+id="(\d+)"')
+_T_OPEN = "<hp:t>"
+_T_CLOSE = "</hp:t>"
+_XML_ENTRY_SUFFIXES = (".xml", ".hpf")
 
 
 def strip_linesegarray(xml):
@@ -73,9 +76,20 @@ def is_wellformed(xml):
     return True
 
 
+def _check_replacements(original_path, replacements):
+    with zipfile.ZipFile(original_path) as z:
+        names = set(z.namelist())
+    for arcname, data in replacements.items():
+        if arcname not in names:
+            raise ValueError("no such entry in archive: %r" % arcname)
+        if arcname.lower().endswith(_XML_ENTRY_SUFFIXES):
+            is_wellformed(data)
+
+
 def repackage(original_path, out_path, replacements):
     if Path(out_path).resolve() == Path(original_path).resolve():
         raise ValueError("out_path must differ from original_path (never modify input in place)")
+    _check_replacements(original_path, replacements)
     with zipfile.ZipFile(original_path, "r") as zin, \
             zipfile.ZipFile(out_path, "w") as zout:
         for item in zin.infolist():
@@ -153,11 +167,8 @@ def remove_memos(xml):
 def apply_replacements(xml, pairs):
     results = []
     for old, new in pairs:
-        count = xml.count(old)
-        if count != 1:
-            raise ValueError(
-                "anchor not unique (count=%d): %r" % (count, old))
-        xml = xml.replace(old, new)
+        start = _find_unique_body_text(xml, old)
+        xml = xml[:start] + _xml_escape(new) + xml[start + len(old):]
         results.append({"old": old, "new": new, "delta": len(new) - len(old)})
     return xml, results
 
@@ -192,13 +203,19 @@ def clone_equation(xml, template_script, anchor):
         + r'</hp:script>.*?</hp:equation>', xml, re.S)
     if not m:
         raise ValueError("template equation not found: %r" % template_script)
-    if xml.count(anchor) != 1:
-        raise ValueError("anchor not unique: %r" % anchor)
+    start = _find_unique_body_text(xml, anchor)
     existing = [int(i) for i in _EQ_ID.findall(xml)]
     new_id = (max(existing) + 1) if existing else 1
     clone = re.sub(r'(<hp:equation\s+id=")\d+(")',
                    r'\g<1>%d\g<2>' % new_id, m.group(0), count=1)
-    return xml.replace(anchor, clone + anchor, 1)
+    return _insert_outside_text(xml, start, clone)
+
+
+def _insert_outside_text(xml, pos, obj):
+    tag_start = pos - len(_T_OPEN)
+    if xml[tag_start:pos] == _T_OPEN:
+        return xml[:tag_start] + obj + xml[tag_start:]
+    return xml[:pos] + _T_CLOSE + obj + _T_OPEN + xml[pos:]
 
 
 def _memo_spans(xml):
@@ -214,6 +231,26 @@ def _mask_memos(xml):
         for i in range(s, e):
             chars[i] = "#"
     return "".join(chars)
+
+
+def _body_text_spans(xml):
+    masked = _EQUATION.sub(lambda m: "#" * len(m.group(0)), _mask_memos(xml))
+    return [(m.start(1), m.end(1)) for m in _T.finditer(masked)]
+
+
+def _find_unique_body_text(xml, text):
+    if not text:
+        raise ValueError("anchor must be non-empty")
+    hits = []
+    for a, b in _body_text_spans(xml):
+        pos = xml.find(text, a, b)
+        while pos != -1:
+            hits.append(pos)
+            pos = xml.find(text, pos + 1, b)
+    if len(hits) != 1:
+        raise ValueError(
+            "anchor not unique in body text (count=%d): %r" % (len(hits), text))
+    return hits[0]
 
 
 def enumerate_body_paragraphs(xml, eq_marker="⟨식⟩"):

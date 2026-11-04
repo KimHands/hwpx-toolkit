@@ -82,7 +82,8 @@ Only the memo and line cache go away; body text and the hyperlink remain.
 | Request | Result |
 |---------|--------|
 | Correct text that isn't in the paragraph | `error: anchor not unique in paragraph 1 (count=0)`, exit code 2, no output file |
-| Save to the input path | `ValueError: out_path must differ from original_path`, original hash unchanged |
+| Save to the input path | `error: out_path must differ from original_path`, exit code 2, original hash unchanged |
+| Swap a figure slot that doesn't exist | `error: no such entry in archive`, exit code 2, no output file |
 
 ---
 
@@ -105,11 +106,9 @@ The CLI enforces these rules. Where the scope differs by command, the table says
 | Never in-place | Always writes a new file (`-o`); refuses an output path equal to the input |
 | Structure-clone repackaging | `mimetype` first · STORED compression · no directory entries. Shell `zip` is never used |
 | linesegarray stripped | `memo clear`, `edit`, `proofread apply`, and `equation clone` remove all stale line caches → HWP is left to recompute layout |
-| Well-formed check | Those four commands validate XML before writing. Low-level `repackage` does not, so check its output with `verify` |
+| Well-formed check | Those four commands validate XML before writing. `repackage` and `figure swap` refuse a target that isn't in the archive and validate replaced XML/HPF entries |
 | Unique anchors | `edit`, `proofread apply`, and `equation clone` apply only when the anchor matches exactly once; proofread requires uniqueness within a paragraph and a single `<hp:t>` run |
-| Text-coordinate (`proofread`) | Matches/replaces only inside body `<hp:t>`; only the replacement is escaped → entities preserved byte-for-byte, no markup injection |
-
-> `edit` replaces raw section XML. It can match equation scripts and does not escape the new text, so use `proofread` for body-text corrections.
+| Body-text coordinates | `edit`, `proofread apply`, and `equation clone` look for anchors only inside body `<hp:t>`, excluding memos and equations. `edit` and `proofread apply` escape the new text so markup is not inserted as-is |
 
 ---
 

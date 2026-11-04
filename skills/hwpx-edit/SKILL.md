@@ -31,8 +31,10 @@ Run: `python3 <this skill>/scripts/hwpx.py <subcommand>`
 1. Never edit the original in place — always `-o` a new version (bump the ver number).
 2. The CLI repackages by structure-clone; never shell `zip`.
 3. Text changes strip all linesegarray (CLI does this) so HWP recomputes layout.
-4. `edit` anchors MUST be unique. Choose anchors in **pure Korean** runs — never
-   spanning an `<hp:equation>` or containing `&gt;` (the XML escape for `>`).
+4. `edit` anchors MUST be unique in body `<hp:t>` text (the CLI ignores memos and
+   equations, and escapes the new text — don't pass raw XML). Choose anchors in
+   **pure Korean** runs — never spanning an `<hp:equation>` or containing `&gt;`
+   (the XML escape for `>`).
 5. You (the model) craft the replacement text: meaning-preserving, hitting the
    requested character delta; the CLI reports the delta so you can check.
 
