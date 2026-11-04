@@ -1,8 +1,11 @@
 import json
+import os
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
+
+import pytest
 
 from conftest import make_hwpx
 
@@ -10,9 +13,33 @@ CLI = str(Path(__file__).resolve().parent.parent
           / "skills" / "hwpx-edit" / "scripts" / "hwpx.py")
 
 
-def run(*args):
+def run(*args, env=None):
     return subprocess.run([sys.executable, CLI, *args],
-                          capture_output=True, text=True)
+                          capture_output=True, encoding="utf-8", env=env)
+
+
+def legacy_codec_env(codec):
+    return {**os.environ, "PYTHONIOENCODING": codec}
+
+
+@pytest.mark.parametrize("codec", ["cp949", "cp1252"])
+def test_extract_stdout_is_utf8_under_legacy_codec(sample_hwpx, codec):
+    r = run("extract", sample_hwpx, "--paragraphs", env=legacy_codec_env(codec))
+    assert r.returncode == 0
+    assert "첫 문단 본문이다." in r.stdout
+    assert "⟨식⟩" in r.stdout
+
+
+@pytest.mark.parametrize("codec", ["cp949", "cp1252"])
+def test_error_stderr_is_utf8_under_legacy_codec(tmp_path, codec):
+    src = make_hwpx(tmp_path)
+    corr = tmp_path / "c.json"
+    corr.write_text(json.dumps([{"p": 0, "old": "존재하지않음", "new": "x"}]),
+                    encoding="utf-8")
+    r = run("proofread", "apply", src, "-o", str(tmp_path / "x.hwpx"),
+            "--from", str(corr), env=legacy_codec_env(codec))
+    assert r.returncode == 2
+    assert "존재하지않음" in r.stderr
 
 
 def test_extract_paragraphs(sample_hwpx):
