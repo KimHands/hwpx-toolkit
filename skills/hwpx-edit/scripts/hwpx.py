@@ -212,10 +212,16 @@ def build_parser():
     return p
 
 
+def use_utf8_output():
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
+
 def main(argv=None):
     args = build_parser().parse_args(argv)
     return args.func(args)
 
 
 if __name__ == "__main__":
+    use_utf8_output()
     sys.exit(main())
