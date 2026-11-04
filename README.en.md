@@ -7,13 +7,13 @@
 **Safely read and edit 한글(HWPX) files — a Claude Code · Codex skill**
 
 *.hwpx is a fragile ZIP structure: save it carelessly and HWP won't open the file.*
-*This skill repackages by cloning the structure and prevents text overlap, so you edit safely — just by talking.*
+*This skill repackages by cloning the structure and clears stale line caches, so you can run the edit just by talking.*
 
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)
 ![deps](https://img.shields.io/badge/deps-stdlib_only-success)
 ![Claude Code](https://img.shields.io/badge/Claude_Code-plugin-8A63D2)
 ![Codex](https://img.shields.io/badge/Codex-skill-000000)
-![Tests](https://img.shields.io/badge/tests-43_passing-success)
+[![tests](https://github.com/KimHands/hwpx-toolkit/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/KimHands/hwpx-toolkit/actions/workflows/test.yml)
 ![License](https://img.shields.io/badge/License-MIT-black)
 
 </div>
@@ -42,7 +42,7 @@ Once installed, you **don't run the CLI yourself.** Just describe the task in th
 ```
 fix the typos in this paper.hwpx
 remove all the memos and save as v2
-swap chapters 3 and 4 and renumber the references in appearance order
+change this sentence as follows and tell me the character delta
 ```
 
 You can also pick it from the slash menu — press `/` and type `hwpx`. The name depends on install method: as a plugin it is **`hwpx-toolkit:hwpx-edit`**; as a personal skill (`~/.claude/skills/hwpx-edit/`) it shows as `/hwpx-edit`.
@@ -51,18 +51,65 @@ Claude then reads the body/paragraphs, drafts the edits, applies them safely at 
 
 ---
 
+## 🔍 Before and after
+
+These are real CLI results on the synthetic test document (`tests/conftest.py`). Because it is synthetic, it has not been opened in HWP.
+
+**Proofread** — `proofread apply`
+
+```diff
+- [0] 첫 문단 본문이다.
++ [0] 첫 문단 본문입니다.
+```
+
+```
+delta +1  p0  '본문이다' -> '본문입니다'
+```
+
+Only `Contents/section0.xml` changes; `mimetype`, `version.xml`, and `BinData/image1.png` stay byte-identical. Entry order and compression methods are unchanged too.
+
+**Memo removal** — `verify` output before and after `memo clear`
+
+```diff
+- {'wellformed': True, 'linesegarray': 1, 'memo_fields': 1, 'hyperlink_fields': 1, 'dup_equation_ids': []}
++ {'wellformed': True, 'linesegarray': 0, 'memo_fields': 0, 'hyperlink_fields': 1, 'dup_equation_ids': []}
+```
+
+Only the memo and line cache go away; body text and the hyperlink remain.
+
+**Safe failure** — an invalid request stops without producing a file.
+
+| Request | Result |
+|---------|--------|
+| Correct text that isn't in the paragraph | `error: anchor not unique in paragraph 1 (count=0)`, exit code 2, no output file |
+| Save to the input path | `ValueError: out_path must differ from original_path`, original hash unchanged |
+
+---
+
+## 🧭 Example scenarios
+
+These are illustrations built from features confirmed with the CLI, not reports from real use.
+
+- **Clear review memos for a submission copy** — "remove all the memos and save as v2" → saves a new file without memos → `verify` shows zero memos → check it yourself in HWP
+- **Proofread into a new version** — "fix the typos" → preview per-paragraph corrections and character deltas with `--check` → apply to a new file
+- **Swap one embedded figure** — "replace image1 with this PNG" → replaces only that PNG slot → prints aspect ratios for the new PNG and existing image areas to compare
+
+---
+
 ## 🛡 Safety guarantees
 
-However the edit is triggered, these always hold.
+The CLI enforces these rules. Where the scope differs by command, the table says so.
 
 | Rule | What it means |
 |------|---------------|
-| Never in-place | Always writes a new file (`-o`); the original is never modified |
+| Never in-place | Always writes a new file (`-o`); refuses an output path equal to the input |
 | Structure-clone repackaging | `mimetype` first · STORED compression · no directory entries. Shell `zip` is never used |
-| linesegarray stripped | Stale line caches removed on every text change → HWP recomputes layout (no text overlap) |
-| Well-formed check | XML validated before the output is written |
-| Unique anchors | A replacement matching more than once is refused; proofread requires uniqueness within a paragraph and a single `<hp:t>` run |
-| Text-coordinate only | Matches/replaces only inside body `<hp:t>`; only the replacement is escaped → entities preserved byte-for-byte, no markup injection |
+| linesegarray stripped | `memo clear`, `edit`, `proofread apply`, and `equation clone` remove all stale line caches → HWP is left to recompute layout |
+| Well-formed check | Those four commands validate XML before writing. Low-level `repackage` does not, so check its output with `verify` |
+| Unique anchors | `edit`, `proofread apply`, and `equation clone` apply only when the anchor matches exactly once; proofread requires uniqueness within a paragraph and a single `<hp:t>` run |
+| Text-coordinate (`proofread`) | Matches/replaces only inside body `<hp:t>`; only the replacement is escaped → entities preserved byte-for-byte, no markup injection |
+
+> `edit` replaces raw section XML. It can match equation scripts and does not escape the new text, so use `proofread` for body-text corrections.
 
 ---
 
@@ -78,7 +125,8 @@ hwpx-toolkit/
 │   └── references/
 │       ├── hwpx-internals.md   OWPML/HWPX internals notes
 │       └── workflows.md        per-task recipes (proofread, memo, figure, equation, guided flow)
-├── tests/                      pytest — 43 (unit + CLI E2E)
+├── tests/                      pytest (unit + CLI E2E)
+├── .github/workflows/test.yml  CI (pytest across OS and Python versions)
 ├── docs/superpowers/           design specs and implementation plans
 ├── .claude-plugin/             Claude Code plugin manifests (plugin/marketplace)
 ├── codex/install.md            Codex install guide
@@ -156,10 +204,15 @@ Run the full suite with the project venv (macOS system Python is externally mana
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install pytest   # first time
-.venv/bin/pytest -v                                      # all 43 must pass
+.venv/bin/pytest -v                                      # all must pass
 ```
 
 The runtime needs only Python 3.9+ stdlib; only the tests depend on pytest.
+
+| CI | Scope |
+|----|-------|
+| Covers | pytest on Ubuntu, macOS, and Windows × Python 3.9 and latest 3.x. Fixtures are synthetic `.hwpx` files built by the tests; CLI behavior under CP949 and CP1252 output is included |
+| Does not cover | Whether files actually open in HWP, layout, or compatibility with real-world documents |
 
 ---
 
@@ -169,6 +222,7 @@ The runtime needs only Python 3.9+ stdlib; only the tests depend on pytest.
 - Overwriting the original — always saves a new version
 - Using an `<hp:equation>` or a `&gt;` escape as an anchor — forbidden (model guidance)
 - Anchors spanning multiple `<hp:t>` runs — unsupported (safe fail, then retry)
+- Body text outside `Contents/section0.xml` — reads and edits cover only the first section, so take care with documents that have `section1.xml` or later
 - The environment can't render HWPX, so **open the file in HWP** to confirm layout after editing
 
 ---

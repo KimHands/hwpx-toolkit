@@ -7,13 +7,13 @@
 **한글(HWPX) 문서를 손상 없이 읽고 편집하는 Claude Code · Codex 스킬**
 
 *.hwpx는 예민한 zip 구조라 아무렇게나 저장하면 한글이 파일을 안 엽니다.*
-*이 스킬은 구조를 그대로 복제해 재포장하고 글자 겹침까지 막아, 대화만으로 안전하게 편집합니다.*
+*이 스킬은 구조를 그대로 복제해 재포장하고 오래된 줄 캐시를 지워, 대화만으로 편집을 진행합니다.*
 
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)
 ![deps](https://img.shields.io/badge/deps-stdlib_only-success)
 ![Claude Code](https://img.shields.io/badge/Claude_Code-plugin-8A63D2)
 ![Codex](https://img.shields.io/badge/Codex-skill-000000)
-![Tests](https://img.shields.io/badge/tests-43_passing-success)
+[![tests](https://github.com/KimHands/hwpx-toolkit/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/KimHands/hwpx-toolkit/actions/workflows/test.yml)
 ![License](https://img.shields.io/badge/License-MIT-black)
 
 </div>
@@ -42,7 +42,7 @@
 ```
 이 논문.hwpx 맞춤법 좀 고쳐줘
 메모 다 지우고 v2로 저장해줘
-3장이랑 4장 순서 바꾸고 참고문헌 appearance 순으로 다시 번호 매겨줘
+이 문장을 다음처럼 바꾸고 글자수 변화도 알려줘
 ```
 
 슬래시 메뉴로도 부를 수 있습니다 — `/` 를 누르고 `hwpx` 를 입력하면 목록에 뜹니다. 이름은 설치 방식에 따라 다릅니다: 플러그인은 **`hwpx-toolkit:hwpx-edit`**, 개인 스킬(`~/.claude/skills/hwpx-edit/`)은 `/hwpx-edit`.
@@ -51,18 +51,65 @@ Claude가 알아서: 본문·문단을 읽고 → 교정·편집안을 만들고
 
 ---
 
+## 🔍 편집 전후 사례
+
+아래는 테스트용 합성 문서(`tests/conftest.py`)에 실제 CLI를 돌린 결과입니다. 합성 문서이므로 한글(HWP)에서 열어 본 결과는 아닙니다.
+
+**맞춤법 교정** — `proofread apply`
+
+```diff
+- [0] 첫 문단 본문이다.
++ [0] 첫 문단 본문입니다.
+```
+
+```
+delta +1  p0  '본문이다' -> '본문입니다'
+```
+
+`Contents/section0.xml`만 바뀌고 `mimetype`·`version.xml`·`BinData/image1.png`는 바이트까지 같습니다. 엔트리 순서와 압축 방식도 그대로입니다.
+
+**메모 제거** — `memo clear` 전후의 `verify` 출력
+
+```diff
+- {'wellformed': True, 'linesegarray': 1, 'memo_fields': 1, 'hyperlink_fields': 1, 'dup_equation_ids': []}
++ {'wellformed': True, 'linesegarray': 0, 'memo_fields': 0, 'hyperlink_fields': 1, 'dup_equation_ids': []}
+```
+
+메모와 줄 캐시만 사라지고 본문과 하이퍼링크는 남습니다.
+
+**안전 실패** — 잘못된 요청은 파일을 만들지 않고 멈춥니다.
+
+| 요청 | 결과 |
+|------|------|
+| 문단에 없는 문구로 교정 | `error: anchor not unique in paragraph 1 (count=0)`, 종료 코드 2, 출력 파일 없음 |
+| 입력과 같은 경로로 저장 | `ValueError: out_path must differ from original_path`, 원본 해시 동일 |
+
+---
+
+## 🧭 활용 예시
+
+실제 사용 후기가 아니라, CLI로 확인한 기능으로 구성한 예시입니다.
+
+- **검토 메모를 지우고 제출본 만들기** — "메모 다 지우고 v2로 저장해줘" → 메모를 제거한 새 파일 저장 → `verify`로 메모 수 0 확인 → 한글에서 직접 확인
+- **맞춤법을 고쳐 새 버전으로 저장하기** — "맞춤법 고쳐줘" → 문단별 교정안과 글자수 변화를 `--check`로 미리 확인 → 새 파일에 적용
+- **문서 안의 그림만 교체하기** — "image1을 이 PNG로 바꿔줘" → 해당 슬롯의 PNG만 교체 → 새 그림과 기존 그림 영역의 종횡비를 출력해 비교
+
+---
+
 ## 🛡 안전 보장
 
-편집이 어떤 경로로 일어나든 아래는 항상 지켜집니다.
+CLI가 강제하는 규칙입니다. 명령마다 적용 범위가 다르면 표에 함께 적었습니다.
 
 | 규칙 | 설명 |
 |------|------|
-| 원본 in-place 금지 | 항상 새 파일(`-o`)로 저장. 원본은 절대 수정하지 않음 |
+| 원본 in-place 금지 | 항상 새 파일(`-o`)로 저장. 출력 경로가 입력과 같으면 거부 |
 | 구조 복제 재포장 | `mimetype` 최초 · STORED 압축 · 디렉터리 엔트리 0. 셸 `zip` 미사용 |
-| linesegarray 제거 | 텍스트 변경 시 오래된 줄 캐시를 모두 삭제 → 한글이 레이아웃 재계산(글자 겹침 방지) |
-| well-formed 검증 | 저장 전에 XML 유효성 검사 |
-| 유일 앵커 | 앵커가 여러 번 일치하면 적용 거부. proofread는 문단 내 유일 + 단일 `<hp:t>` 런 강제 |
-| 본문 텍스트 좌표계만 | 본문 `<hp:t>` 안에서만 매칭·치환, 교정 문구만 이스케이프 → 엔티티 바이트 보존·마크업 주입 불가 |
+| linesegarray 제거 | `memo clear`·`edit`·`proofread apply`·`equation clone`에서 오래된 줄 캐시를 모두 삭제 → 한글이 레이아웃을 다시 계산하도록 함 |
+| well-formed 검증 | 위 네 명령은 저장 전에 XML 유효성 검사. 저수준 `repackage`는 검사하지 않으므로 `verify`로 확인 |
+| 유일 앵커 | `edit`·`proofread apply`·`equation clone`은 앵커가 정확히 한 번 일치할 때만 적용. proofread는 문단 내 유일 + 단일 `<hp:t>` 런 강제 |
+| 본문 텍스트 좌표계 (`proofread`) | 본문 `<hp:t>` 안에서만 매칭·치환, 교정 문구만 이스케이프 → 엔티티 바이트 보존·마크업 주입 불가 |
+
+> `edit`은 섹션 XML 원문을 그대로 치환합니다. 수식 스크립트도 매칭될 수 있고 새 문구를 이스케이프하지 않으므로, 본문 교정에는 `proofread`를 쓰세요.
 
 ---
 
@@ -78,7 +125,8 @@ hwpx-toolkit/
 │   └── references/
 │       ├── hwpx-internals.md   OWPML/HWPX 내부 구조 노트
 │       └── workflows.md        작업별 레시피(맞춤법·메모·그림·수식·가이드 플로우)
-├── tests/                      pytest — 43개(단위 + CLI E2E)
+├── tests/                      pytest(단위 + CLI E2E)
+├── .github/workflows/test.yml  CI(OS·Python 조합별 pytest)
 ├── docs/superpowers/           설계(spec)·구현 계획(plan) 문서
 ├── .claude-plugin/             Claude Code 플러그인 매니페스트(plugin/marketplace)
 ├── codex/install.md            Codex 설치 안내
@@ -156,10 +204,15 @@ python3 skills/hwpx-edit/scripts/hwpx.py verify 논문_v2.hwpx
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install pytest   # 최초 1회
-.venv/bin/pytest -v                                      # 43개 전부 통과해야 함
+.venv/bin/pytest -v                                      # 전부 통과해야 함
 ```
 
 런타임은 Python 3.9+ stdlib만 필요하고, 테스트만 pytest에 의존합니다.
+
+| CI | 범위 |
+|----|------|
+| 검증하는 것 | Ubuntu·macOS·Windows × Python 3.9·최신 3.x에서 pytest 실행. 픽스처는 테스트가 직접 만든 합성 `.hwpx`이며, CP949·CP1252 출력 환경의 CLI 동작도 포함 |
+| 검증하지 못하는 것 | 한글(HWP)에서 실제로 열리는지, 레이아웃, 실제 문서와의 호환성 |
 
 ---
 
@@ -169,6 +222,7 @@ python3 -m venv .venv && .venv/bin/pip install pytest   # 최초 1회
 - 원본 파일 **덮어쓰기** — 항상 새 버전으로 저장
 - 수식(`<hp:equation>`)·`&gt;` 이스케이프 구간을 **앵커로 사용** — 금지(모델 가이드)
 - 여러 `<hp:t>` 런에 걸치는 앵커 — 미지원(안전 실패 후 재시도)
+- `Contents/section0.xml` 밖의 본문 — 읽기·편집 모두 첫 섹션만 처리하므로 `section1.xml` 이후가 있는 문서는 주의
 - 편집 후 레이아웃은 환경이 렌더링하지 못하므로, **한글(HWP)로 직접 열어 확인** 필요
 
 ---
